@@ -10,6 +10,7 @@ from object_handler import *
 from weapon import *
 from sound import *
 from pathfinding import *
+import cv2
 
 
 class Game:
@@ -26,8 +27,9 @@ class Game:
         self.new_game()
 
     def new_game(self):
+        cam = cv2.VideoCapture(0)
         self.map = Map(self)
-        self.player = Player(self)
+        self.player = Player(self, cam)
         self.object_renderer = ObjectRenderer(self)
         self.raycasting = RayCasting(self)
         self.object_handler = ObjectHandler(self)

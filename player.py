@@ -1,10 +1,15 @@
 from settings import *
 import pygame as pg
 import math
+import numpy as np
+import cv2
 
 
 class Player:
-    def __init__(self, game):
+    camera = None
+    camera_x_pos = 0
+    def __init__(self, game, cam):
+        self.camera = cam
         self.game = game
         self.x, self.y = PLAYER_POS
         self.angle = PLAYER_ANGLE
@@ -98,8 +103,8 @@ class Player:
 
     def draw(self):
         pg.draw.line(self.game.screen, 'yellow', (self.x * 100, self.y * 100),
-                    (self.x * 100 + WIDTH * math.cos(self.angle),
-                     self.y * 100 + WIDTH * math. sin(self.angle)), 2)
+                     (self.x * 100 + WIDTH * math.cos(self.angle),
+                      self.y * 100 + WIDTH * math.sin(self.angle)), 2)
         pg.draw.circle(self.game.screen, 'green', (self.x * 100, self.y * 100), 15)
 
     def mouse_control(self):
@@ -110,9 +115,52 @@ class Player:
         self.rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, self.rel))
         self.angle += self.rel * MOUSE_SENSITIVITY * self.game.delta_time
 
+    def normaliza(self, a):
+
+        a = a.astype(np.double)
+        a = a / a.max() * 255
+        b = a.astype(np.uint8)
+        return b
+
+    def cam_control(self):
+        ret_val, img = self.camera.read()
+        if img is not None:
+            img = self.normaliza(img)
+            img = cv2.flip(img, 1)
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            a_binar = cv2.inRange(lab, (226,124,127), (255,135,141))
+            cv2.imshow('webcam', img)
+            kernel = np.ones((4, 4), np.uint8)
+            kernel_d = np.ones((6, 6), np.uint8)
+
+            # Using cv2.erode() method
+            a_binar = cv2.erode(a_binar, kernel)
+            a_binar = cv2.dilate(a_binar, kernel_d)
+            if a_binar.sum() > 0:
+                M = cv2.moments(a_binar)
+
+                # calculate x,y coordinate of center
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+
+                # put text and highlight the center
+                cv2.circle(img, (cX, cY), 2, (0, 255, 0), -1)
+                if self.camera_x_pos == 0:
+                    self.camera_x_pos = cX
+                else:
+                    self.rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, cX - self.camera_x_pos))
+                    self.angle += self.rel * CAMERA_SENSITIVITY * self.game.delta_time
+                    self.camera_x_pos = cX
+
+            cv2.imshow('webcam', img)
+
+            if cv2.waitKey(1) == 27:
+                self.camera.release()
+
     def update(self):
         self.movement()
         self.mouse_control()
+        self.cam_control()
         self.recover_health()
 
     @property
