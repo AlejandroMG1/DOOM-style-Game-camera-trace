@@ -12,8 +12,9 @@ from sound import *
 from pathfinding import *
 import cv2
 
-
+#Programa principal
 class Game:
+
     def __init__(self):
         pg.init()
         pg.mouse.set_visible(False)
@@ -27,8 +28,10 @@ class Game:
         self.new_game()
 
     def new_game(self):
+        #Instanciamos la captura de video
         cam = cv2.VideoCapture(0)
         self.map = Map(self)
+        #Pasamos la instancia de captura de video al jugador, en la clase player se maneja la logica de procesado de imagenes
         self.player = Player(self, cam)
         self.object_renderer = ObjectRenderer(self)
         self.raycasting = RayCasting(self)

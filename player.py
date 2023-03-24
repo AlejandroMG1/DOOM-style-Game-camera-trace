@@ -1,20 +1,25 @@
+from img_procesing import normalize, get_lab_segment, get_centroid
 from settings import *
 import pygame as pg
 import math
-import numpy as np
 import cv2
 
 
 class Player:
+    # Variable que guarda la instancia de la captura de video
     camera = None
-    camera_x_pos = 0
+    # Variable que guarda la posición actual del objeto al que se le hace seguimiento en X
+    camera_x_pos = -1
+
     def __init__(self, game, cam):
         self.camera = cam
         self.game = game
         self.x, self.y = PLAYER_POS
+        # variable que controla la camara del jugador
         self.angle = PLAYER_ANGLE
         self.shot = False
         self.health = PLAYER_MAX_HEALTH
+        # Variable que guarda el recorrido de la camara desde la lectura anterior
         self.rel = 0
         self.health_recovery_delay = 700
         self.time_prev = pg.time.get_ticks()
@@ -115,42 +120,40 @@ class Player:
         self.rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, self.rel))
         self.angle += self.rel * MOUSE_SENSITIVITY * self.game.delta_time
 
-    def normaliza(self, a):
-
-        a = a.astype(np.double)
-        a = a / a.max() * 255
-        b = a.astype(np.uint8)
-        return b
+    """Metodo para controlar la camara del personaje con la camara del equipo"""
 
     def cam_control(self):
+        # Tomo una imagen de la camara
         ret_val, img = self.camera.read()
+        # verifico que exista una imagen ya que hay frames donde no se alcanza a tomar una imagen
         if img is not None:
-            img = self.normaliza(img)
+            # normalizo la imagen
+            img = normalize(img)
+            # Volteo entorno al eje vertical la imagen para que la imagen captada coincida con la tirrección en a la que
+            # se encuentra la luz
             img = cv2.flip(img, 1)
-            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-            a_binar = cv2.inRange(lab, (226,124,127), (255,135,141))
-            cv2.imshow('webcam', img)
-            kernel = np.ones((4, 4), np.uint8)
-            kernel_d = np.ones((6, 6), np.uint8)
+            # Tranformo el espacio de color de la imagen a lAB y le asigno el rango de valores que deseo captar
+            binar_segment = get_lab_segment(img, (226, 124, 127), (255, 135, 141))
 
-            # Using cv2.erode() method
-            a_binar = cv2.erode(a_binar, kernel)
-            a_binar = cv2.dilate(a_binar, kernel_d)
-            if a_binar.sum() > 0:
-                M = cv2.moments(a_binar)
-
-                # calculate x,y coordinate of center
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-
-                # put text and highlight the center
-                cv2.circle(img, (cX, cY), 2, (0, 255, 0), -1)
-                if self.camera_x_pos == 0:
-                    self.camera_x_pos = cX
+            # si se encuentra al menos un pixel que coincida con el rango definido inicio el proceso de rastreo
+            if binar_segment.sum() > 0:
+                # obtengo los puntos X y Y del centro del objeto identificado
+                c_x, c_y = get_centroid(binar_segment)
+                # marco un indicador en el centro del objeto identificado
+                cv2.circle(img, (c_x, c_y), 3, (0, 255, 0), -1)
+                # si es la primera vez que se identifica un objeto al cual hacer seguimiento se asigna el valor del
+                # centro en X como posición inicial
+                if self.camera_x_pos == -1:
+                    self.camera_x_pos = c_x
+                # de lo contrario se procede a hacer el movimiento de la camara del personaje
                 else:
-                    self.rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, cX - self.camera_x_pos))
-                    self.angle += self.rel * CAMERA_SENSITIVITY * self.game.delta_time
-                    self.camera_x_pos = cX
+                    # primero guardo el recorrido del objeto en la imagen desde la anterior captura
+                    self.rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, c_x - self.camera_x_pos))
+                    # actualizo la camara del personaje teniendo en cuenta el recorrido del objeto, un valor de
+                    # sensibilidad, el ancho de la camara y la diferencia de tiempo
+                    self.angle += self.rel * CAMERA_SENSITIVITY * img.shape[1] * self.game.delta_time
+                    # actualizo la posición actual del objeto
+                    self.camera_x_pos = c_x
 
             cv2.imshow('webcam', img)
 
@@ -160,6 +163,7 @@ class Player:
     def update(self):
         self.movement()
         self.mouse_control()
+        # introdusco el control por la camara del equipo en el flujo del juego
         self.cam_control()
         self.recover_health()
 
