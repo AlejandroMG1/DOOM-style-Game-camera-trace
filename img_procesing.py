@@ -19,9 +19,9 @@ def normalize(a):
 def get_lab_segment(img, min, max):
     # Convierto la imagen a LAB
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    # obtengo la mascara de las posiciones que coinciden con el rango dado
+    # realizo la umbralización de la imagen con el rango definido
     a_binar = cv2.inRange(lab, min, max)
-    # creo los estructurales para realizar eroción y dilatación respectivamente
+    # creo los elemtos estructurales para realizar eroción y dilatación respectivamente
     kernel = np.ones((4, 4), np.uint8)
     kernel_d = skimage.morphology.disk(3)
 
@@ -31,7 +31,7 @@ def get_lab_segment(img, min, max):
     a_binar = cv2.dilate(a_binar, kernel_d)
     return a_binar
 
-
+"""Metodo que calcula el centride de un objeto unico en la imagen"""
 def get_centroid(bin_img):
     # Calculo los momentos del blob
     M = cv2.moments(bin_img)
